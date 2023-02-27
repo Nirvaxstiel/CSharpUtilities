@@ -2,21 +2,24 @@
 
 Similar to Magic-Regexp, allows for a more intuitive way to build regexes.
 
-Sample:
+Sample 1:
 
+```csharp
+var testString = "T1231234T";
+var regexString = new RegexBuilder()
+    CharIn("STFGM")
+    .Digit.Exactly(7)
+    .Letter.Exactly(1)
+    .ToRegex(RegexOptions.IgnoreCase);
+var isMatch = regexString.IsMatch(testString);
 ```
-var testString = "S1231234d";
-var isMatch = testString.IsMatch(regex=>
-    regex.StartOfLine()
-    //.NegativeLookbehind(".") //If you want to be more explicit, but this is more expensive.
-    //.AnyOf(new char[] {'T','S',}).WithOptions(RegexOptions.IgnoreCase) 
-    .AnyOf("TSGMF", RegexOptions.IgnoreCase) //if you want to use ToRegexString() and print a usable string and wish to keep upper and lower case set for some reason.
-    .Digit().Exactly(7)
-    .Char().Exactly(1)
-    .EndOfLine()
-    //.NegativeLookahead(".") //If you want to be more explicit, but this is more expensive.
-    .Optimise()
-    .ToRegex()
+
+Sample 2:
+
+```csharp
+var isMatch = testString.IsMatch(regex => regex.CharIn("STFGM")
+    .Digit.Exactly(7)
+    .Letter.Exactly(1)
+    .ToRegex(RegexOptions.IgnoreCase)
 );
-Console.WriteLine(isMatch);
 ```

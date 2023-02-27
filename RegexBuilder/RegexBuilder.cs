@@ -1,206 +1,169 @@
-public class RegexBuilder : IDisposable
+public class RegexBuilder
 {
-	private readonly StringBuilder _pattern;
-    private RegexOptions _options;
-    
+	private List<object> Inputs;
+	
 	public RegexBuilder()
-    {
-        _pattern = new StringBuilder();
-        _options = RegexOptions.None;
-    }
-	
-	public RegexBuilder(string pattern, RegexOptions options= RegexOptions.None)
 	{
-		_pattern = new StringBuilder(pattern);
-		_options = options;
+		Inputs = new List<object>();
 	}
 	
-    public RegexBuilder StartOfLine() => Append("^");
-    public RegexBuilder EndOfLine() => Append("$");
-    public RegexBuilder AnyCharacter() => Append(".");
-	public RegexBuilder AnyOf(string characters, RegexOptions options = RegexOptions.None)
+	#region Inputs
+	public RegexBuilder Exactly(string input)
 	{
-	    if ((options & RegexOptions.IgnoreCase) == RegexOptions.IgnoreCase)
-	    {
-	        characters = $"{characters.ToLowerInvariant()}{characters.ToUpperInvariant()}";
-	    }
-
-	    _pattern.Append($"[{Regex.Escape(characters)}]");
-	    _options |= options;
-	    return this;
+		Inputs.Add(Regex.Escape(input));
+		return this;
 	}
-    public RegexBuilder AnyOf(params char[] chars) => Append($"[{string.Join("", chars)}]");
-    public RegexBuilder AnyOf(params string[] inputs) => Append($"({string.Join("|", inputs.Select(Regex.Escape))})");
-	public RegexBuilder NoneOf(params string[] chars) => Append($"[^{string.Join("", chars)}]");
-	public RegexBuilder Exactly(int n) => Append($"{{{n}}}");
-    public RegexBuilder Exactly(string text) => Append(Regex.Escape(text));
-    public RegexBuilder ZeroOrMore() => Append("*");
-    public RegexBuilder OneOrMore() => Append("+");
-    public RegexBuilder ZeroOrOne() => Append("?");
-    public RegexBuilder And(params RegexBuilder[] regexBuilders) => Append(string.Join("", regexBuilders.Select(x => x._pattern)));
-    public RegexBuilder Not() => Append("^");
-    public RegexBuilder Or(params RegexBuilder[] regexBuilders) => Append($"({string.Join("|", regexBuilders.Select(x => x._pattern))})");
-    public RegexBuilder Between(int min, int max) => Append($"{{{min},{max}}}");
-    public RegexBuilder AtLeast(int min) => Append($"{{{min},}}");
-    public RegexBuilder AtMost(int max) => Append($"{{0,{max}}}");
-    public RegexBuilder Word() => Append("\\w+");
-    public RegexBuilder Digit() => Append("\\d");
-    public RegexBuilder Whitespace() => Append("\\s");
-    public RegexBuilder Tab() => Append("\\t");
-    public RegexBuilder Newline() => Append("\\n");
-    public RegexBuilder Linebreak() => Append("\\r\\n|\\r|\\n");
-    public RegexBuilder IgnoreCase() => Insert(0, "(?i)");
-    public RegexBuilder Multiline() => Insert(0, "(?m)");
-    public RegexBuilder PositiveLookahead(string text) => Append($"(?={text})");
-	public RegexBuilder PositiveLookahead(RegexBuilder regexBuilder) => Append($"(?={regexBuilder._pattern})");
-    public RegexBuilder PositiveLookbehind(string text) => Append($"(?<={text})");
-	public RegexBuilder PositiveLookbehind(RegexBuilder regexBuilder) => Append($"(?<={regexBuilder._pattern})");	
-	public RegexBuilder NegativeLookahead(char c) => Append($"(?!.*[{Regex.Escape(c.ToString())}])");
-    public RegexBuilder NegativeLookahead(string text) => Append($"(?!{text})");
-	public RegexBuilder NegativeLookbehind(string pattern) => Append($"(?<!{pattern})");
-    public RegexBuilder NegativeLookbehind(RegexBuilder regexBuilder) => Append($"(?<!{regexBuilder._pattern})");		
-    public RegexBuilder Optionally() => Append("?");
-    public RegexBuilder Mandatory() => Append("+");
-    public RegexBuilder CharIn(string str) => Append($"[{Regex.Escape(str)}]");
-    public RegexBuilder CharNotIn(string str) => Append($"[^{Regex.Escape(str)}]");
-    public RegexBuilder Char() => Append(".");
-    public RegexBuilder WordChar() => Append("\\w");
-    public RegexBuilder WordBoundary() => Append("\\b");
-    public RegexBuilder Letter() => Append("[A-Za-z]");
-    public RegexBuilder LowercaseLetter() => Append("[a-z]");
-    public RegexBuilder UppercaseLetter() => Append("[A-Z]");
-
-    private RegexBuilder Append(string str)
-    {
-        _pattern.Append(str);
-        return this;
-    }
-
-    private RegexBuilder Insert(int index, string str)
-    {
-        _pattern.Insert(index, str);
-        return this;
-    }
 	
-	public RegexBuilder WithOptions(params RegexOptions[] options)
-	{	
-		foreach (var option in options)
-        {
-            this._options |= option;
-        }
-        return this;
-	}
-
-	public RegexBuilder RemoveOptions(params RegexOptions[] options)
+	public RegexBuilder Exactly(int count)
 	{
-		foreach (var option in options)
-        {
-            this._options &= ~option;
-        }
-        return this;
+		Inputs.Add($"{{{count}}}");
+		return this;
 	}
-	
-	public RegexBuilder Optimise(){
-		return new RegexBuilder(Optimise(this._pattern.ToString()), _options);
-	}
-	
-	public string Optimise(string pattern)
-    {
-        pattern = RemoveUnnecessaryCharacters(pattern);
-        pattern = MergeCharacterClasses(pattern);
-        pattern = ReorderAlternations(pattern);
-        pattern = SimplifyQuantifiers(pattern);
-        pattern = RemoveUnnecessaryGroups(pattern);
 
-        // Compile the optimized pattern with the original RegexOptions
-        Regex regex = new Regex(pattern, _options);
-        return regex.ToString();
-    }
-
-    private string RemoveUnnecessaryCharacters(string pattern)
-    {
-        pattern = Regex.Replace(pattern, @"(?<!\\)\\(?=\\)", "");
-        pattern = Regex.Replace(pattern, @"(?<!\\)\\(?=\s)", "");
-        pattern = Regex.Replace(pattern, @"(?<=\s)\\(?!$)", "");
-        return pattern;
-    }
-
-    private string MergeCharacterClasses(string pattern)
-    {
-        pattern = Regex.Replace(pattern, @"\[\s*(\\.|[^\]\\])+\s*\]", match =>
-        {
-            string merged = "";
-            bool negate = false;
-            foreach (char c in match.Value)
-            {
-                if (c == '[')
-                {
-                    merged += c;
-                }
-                else if (c == '^' && merged.Length == 1)
-                {
-                    negate = true;
-                }
-                else if (c == ']')
-                {
-                    merged += c;
-                    break;
-                }
-                else
-                {
-                    merged += c;
-                }
-            }
-            string patternPart = merged.Substring(1, merged.Length - 2);
-            if (negate)
-            {
-                patternPart = "^" + patternPart;
-            }
-            patternPart = Regex.Escape(patternPart);
-            return "[" + patternPart + "]";
-        });
-        return pattern;
-    }
-
-    private string ReorderAlternations(string pattern)
-    {
-        pattern = Regex.Replace(pattern, @"\|(?<insideBrackets>[^\[\]]*\])+(?<afterBrackets>[^\|]*)", match =>
-        {
-            string insideBrackets = match.Groups["insideBrackets"].Value;
-            string afterBrackets = match.Groups["afterBrackets"].Value;
-            string reordered = "|" + afterBrackets + insideBrackets;
-            return reordered;
-        });
-        return pattern;
-    }
-
-    private string SimplifyQuantifiers(string pattern)
-    {
-        pattern = Regex.Replace(pattern, @"(\w)(?<!\(\?)(\*)\+", "$1*");
-        pattern = Regex.Replace(pattern, @"(\w)(?<!\(\?)(\+){2,}", "$1$2");
-        pattern = Regex.Replace(pattern, @"(\w)(?<!\(\?)(\*){2,}", "$1*");
-        return pattern;
-    }
-
-    private string RemoveUnnecessaryGroups(string pattern)
-    {
-        pattern = Regex.Replace(pattern, @"(?<!\\)\((?<group>[^?].*?)\)(?!\*)", "${group}");
-        pattern = Regex.Replace(pattern, @"\(\?<.*?>", "(");
-        return pattern;
-    }
-
-    public Regex ToRegex()
-    {
-        return new Regex(_pattern.ToString(), _options);
-    }
-	
-	public string ToRegexString()
+	public RegexBuilder CharIn(string input)
 	{
-		return _pattern.ToString();
+		Inputs.Add($"[{Regex.Escape(input)}]");
+		return this;
 	}
 
-    public void Dispose()
-    {
-        //_pattern.Clear();
-    }
+	public RegexBuilder CharNotIn(string input)
+	{
+		Inputs.Add($"[^{Regex.Escape(input)}]");
+		return this;
+	}
+
+	public RegexBuilder AnyOf(params string[] inputs)
+	{
+		Inputs.Add($"({string.Join("|", inputs.Select(Regex.Escape))})");
+		return this;
+	}
+
+	public RegexBuilder Char => Exactly(@".");
+
+	public RegexBuilder Word => Exactly(@"\w");
+
+	public RegexBuilder WordChar => Exactly(@"\w");
+
+	public RegexBuilder WordBoundary => Exactly(@"\b");
+
+	public RegexBuilder Digit => Exactly(@"\d");
+
+	public RegexBuilder Whitespace => Exactly(@"\s");
+
+	public RegexBuilder Letter => Exactly(@"\p{L}");
+
+	public RegexBuilder LowercaseLetter => Exactly(@"\p{Ll}");
+
+	public RegexBuilder UppercaseLetter => Exactly(@"\p{Lu}");
+
+	public RegexBuilder Tab => Exactly(@"\t");
+
+	public RegexBuilder Linefeed => Exactly(@"\n");
+
+	public RegexBuilder CarriageReturn => Exactly(@"\r");
+
+	public RegexBuilder Not => new RegexBuilder().Exactly(@"(?:(?!\b)");
+
+	public RegexBuilder Maybe => new RegexBuilder().Exactly(@"?");
+
+	public RegexBuilder OneOrMore => new RegexBuilder().Exactly(@"+");
+
+	public RegexBuilder As(string groupName)
+	{
+		Inputs.Add($")(?<{groupName}>");
+		return this;
+	}
+
+	public RegexBuilder GroupedAs(string groupName)
+	{
+		Inputs.Add($"(?<{groupName}>");
+		return this;
+	}
+
+	public RegexBuilder Grouped => Exactly(@"(");
+	#endregion Inputs
+	
+	#region Chains
+	public RegexBuilder And => this;
+
+	public RegexBuilder AndReferenceTo(string groupName)
+	{
+		Inputs.Add($@"\k<{groupName}>");
+		return this;
+	}
+
+	public RegexBuilder Or => new RegexBuilder().Exactly(@"|");
+
+	public RegexBuilder After => new RegexBuilder().Exactly(@"(?<=)");
+
+	public RegexBuilder Before => new RegexBuilder().Exactly(@"(?=)");
+
+	public RegexBuilder NotAfter => new RegexBuilder().Exactly(@"(?<!)");
+
+	public RegexBuilder NotBefore => new RegexBuilder().Exactly(@"(?!>)");
+
+	public RegexBuilder Times => this;
+
+	public RegexBuilder Between(int min, int max)
+	{
+		Inputs.Add($"{{{min},{max}}}");
+		return this;
+	}
+
+	public RegexBuilder AtLeast(int num)
+	{
+		Inputs.Add($"{{{num},}}");
+		return this;
+	}
+	
+	public RegexBuilder Max(int max)
+	{
+		Inputs.Add($"{{0,{max}}}");
+		return this;
+	}
+
+	public RegexBuilder Any()
+	{
+		Inputs.Add($"+");
+		return this;
+	}
+
+	public RegexBuilder Optionally => new RegexBuilder().Exactly(@"?");
+
+	public RegexBuilder LineStart => Exactly(@"^");
+
+	public RegexBuilder LineEnd => Exactly(@"$");
+	#endregion Chains
+	public Regex ToRegex(params RegexOptions[] options)
+	{
+		var pattern = Regex.Unescape($"^{string.Join("", Inputs)}$");
+		Optimise(pattern);
+		return new Regex(pattern, (RegexOptions)options.Aggregate(0, (acc, option) => acc | (int)option));
+	}
+	
+	private void Optimise(string pattern)
+	{
+		// Simplify character sets
+		pattern = Regex.Replace(pattern, @"\[(?<chars>[^\[\]])\]", m =>
+		{
+			var chars = m.Groups["chars"].Value;
+			return "[" + string.Concat(chars.OrderBy(c => c).Distinct().Select((c, i) =>
+				i > 0 && c == chars[i - 1] + 1 ? "" : c.ToString() + (i == chars.Length - 1 ? "" : "-")));
+		});
+
+		// Unroll quantifiers
+		pattern = Regex.Replace(pattern, @"(?<=\\?.){(\d+)}", m =>
+		{
+			var count = int.Parse(m.Groups[1].Value);
+			return string.Concat(Enumerable.Repeat(m.Value.Substring(0, m.Value.Length - 3), count));
+		});
+
+		// Reorder alternation
+		pattern = Regex.Replace(pattern, @"\((?:[^\(\)\|]*\|)+[^\(\)\|]*\)", m =>
+		{
+			var alternatives = m.Value.Substring(1, m.Value.Length - 2).Split('|');
+			var reordered = alternatives.OrderByDescending(a => a.Length).ToArray();
+			return "(" + string.Join("|", reordered) + ")";
+		});
+	}
 }
