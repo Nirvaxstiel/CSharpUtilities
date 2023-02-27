@@ -18,6 +18,17 @@ public class RegexBuilder : IDisposable
     public RegexBuilder StartOfLine() => Append("^");
     public RegexBuilder EndOfLine() => Append("$");
     public RegexBuilder AnyCharacter() => Append(".");
+	public RegexBuilder AnyOf(string characters, RegexOptions options = RegexOptions.None)
+	{
+	    if ((options & RegexOptions.IgnoreCase) == RegexOptions.IgnoreCase)
+	    {
+	        characters = $"{characters.ToLowerInvariant()}{characters.ToUpperInvariant()}";
+	    }
+
+	    _pattern.Append($"[{Regex.Escape(characters)}]");
+	    _options |= options;
+	    return this;
+	}
     public RegexBuilder AnyOf(params char[] chars) => Append($"[{string.Join("", chars)}]");
     public RegexBuilder AnyOf(params string[] inputs) => Append($"({string.Join("|", inputs.Select(Regex.Escape))})");
 	public RegexBuilder NoneOf(params string[] chars) => Append($"[^{string.Join("", chars)}]");
@@ -72,7 +83,7 @@ public class RegexBuilder : IDisposable
     }
 	
 	public RegexBuilder WithOptions(params RegexOptions[] options)
-	{
+	{	
 		foreach (var option in options)
         {
             this._options |= option;
@@ -89,98 +100,104 @@ public class RegexBuilder : IDisposable
         return this;
 	}
 	
-	public RegexBuilder Optimise()
-	{
-	    string pattern = this._pattern.ToString();
-	    RemoveUnnecessaryCharacters(pattern);
-	    MergeCharacterClasses(pattern);
-	    ReorderAlternations(pattern);
-	    SimplifyQuantifiers(pattern);
-	    RemoveUnnecessaryGroups(pattern);
-	    return new RegexBuilder(pattern, this._options);
+	public RegexBuilder Optimise(){
+		return new RegexBuilder(Optimise(this._pattern.ToString()), _options);
 	}
+	
+	public string Optimise(string pattern)
+    {
+        pattern = RemoveUnnecessaryCharacters(pattern);
+        pattern = MergeCharacterClasses(pattern);
+        pattern = ReorderAlternations(pattern);
+        pattern = SimplifyQuantifiers(pattern);
+        pattern = RemoveUnnecessaryGroups(pattern);
 
-	private string Optimise(string pattern)
-	{
-	    RemoveUnnecessaryCharacters(pattern);
-	    MergeCharacterClasses(pattern);
-	    ReorderAlternations(pattern);
-	    SimplifyQuantifiers(pattern);
-	    RemoveUnnecessaryGroups(pattern);
-	    return pattern;
-	}
+        // Compile the optimized pattern with the original RegexOptions
+        Regex regex = new Regex(pattern, _options);
+        return regex.ToString();
+    }
 
-	private void RemoveUnnecessaryCharacters(string pattern)
-	{
-		pattern = Regex.Replace(pattern, @"(?<!\\)\\(?=\\)", "");
-		pattern = Regex.Replace(pattern, @"(?<!\\)\\(?=\s)", "");
-		pattern = Regex.Replace(pattern, @"(?<=\s)\\(?!$)", "");
-	}
+    private string RemoveUnnecessaryCharacters(string pattern)
+    {
+        pattern = Regex.Replace(pattern, @"(?<!\\)\\(?=\\)", "");
+        pattern = Regex.Replace(pattern, @"(?<!\\)\\(?=\s)", "");
+        pattern = Regex.Replace(pattern, @"(?<=\s)\\(?!$)", "");
+        return pattern;
+    }
 
-	private void MergeCharacterClasses(string pattern)
-	{
-		pattern = Regex.Replace(pattern, @"\[\s*(\\.|[^\]\\])+\s*\]", match =>
-		{
-			string merged = "";
-			bool negate = false;
-			foreach (char c in match.Value)
-			{
-				if (c == '[')
-				{
-					merged += c;
-				}
-				else if (c == '^' && merged.Length == 1)
-				{
-					negate = true;
-				}
-				else if (c == ']')
-				{
-					merged += c;
-					break;
-				}
-				else
-				{
-					merged += c;
-				}
-			}
-			string patternPart = merged.Substring(1, merged.Length - 2);
-			if (negate)
-			{
-				patternPart = "^" + patternPart;
-			}
-			patternPart = Regex.Escape(patternPart);
-			return "[" + patternPart + "]";
-		});
-	}
+    private string MergeCharacterClasses(string pattern)
+    {
+        pattern = Regex.Replace(pattern, @"\[\s*(\\.|[^\]\\])+\s*\]", match =>
+        {
+            string merged = "";
+            bool negate = false;
+            foreach (char c in match.Value)
+            {
+                if (c == '[')
+                {
+                    merged += c;
+                }
+                else if (c == '^' && merged.Length == 1)
+                {
+                    negate = true;
+                }
+                else if (c == ']')
+                {
+                    merged += c;
+                    break;
+                }
+                else
+                {
+                    merged += c;
+                }
+            }
+            string patternPart = merged.Substring(1, merged.Length - 2);
+            if (negate)
+            {
+                patternPart = "^" + patternPart;
+            }
+            patternPart = Regex.Escape(patternPart);
+            return "[" + patternPart + "]";
+        });
+        return pattern;
+    }
 
-	private void ReorderAlternations(string pattern)
-	{
-		pattern = Regex.Replace(pattern, @"\|(?<insideBrackets>[^\[\]]*\])+(?<afterBrackets>[^\|]*)", match =>
-		{
-			string insideBrackets = match.Groups["insideBrackets"].Value;
-			string afterBrackets = match.Groups["afterBrackets"].Value;
-			string reordered = "|" + afterBrackets + insideBrackets;
-			return reordered;
-		});
-	}
+    private string ReorderAlternations(string pattern)
+    {
+        pattern = Regex.Replace(pattern, @"\|(?<insideBrackets>[^\[\]]*\])+(?<afterBrackets>[^\|]*)", match =>
+        {
+            string insideBrackets = match.Groups["insideBrackets"].Value;
+            string afterBrackets = match.Groups["afterBrackets"].Value;
+            string reordered = "|" + afterBrackets + insideBrackets;
+            return reordered;
+        });
+        return pattern;
+    }
 
-	private void SimplifyQuantifiers(string pattern)
-	{
-		pattern = Regex.Replace(pattern, @"(\w)(?<!\(\?)(\*)\+", "$1*");
-		pattern = Regex.Replace(pattern, @"(\w)(?<!\(\?)(\+){2,}", "$1$2");
-		pattern = Regex.Replace(pattern, @"(\w)(?<!\(\?)(\*){2,}", "$1*");
-	}
+    private string SimplifyQuantifiers(string pattern)
+    {
+        pattern = Regex.Replace(pattern, @"(\w)(?<!\(\?)(\*)\+", "$1*");
+        pattern = Regex.Replace(pattern, @"(\w)(?<!\(\?)(\+){2,}", "$1$2");
+        pattern = Regex.Replace(pattern, @"(\w)(?<!\(\?)(\*){2,}", "$1*");
+        return pattern;
+    }
 
-	private void RemoveUnnecessaryGroups(string pattern)
-	{
-		pattern = Regex.Replace(pattern, @"(?<!\\)\((?<group>[^?].*?)\)(?!\*)", "${group}");
-		pattern = Regex.Replace(pattern, @"\(\?<.*?>", "(");
-	}
+    private string RemoveUnnecessaryGroups(string pattern)
+    {
+        pattern = Regex.Replace(pattern, @"(?<!\\)\((?<group>[^?].*?)\)(?!\*)", "${group}");
+        pattern = Regex.Replace(pattern, @"\(\?<.*?>", "(");
+        return pattern;
+    }
 
     public Regex ToRegex()
     {
-        return new Regex(_pattern.ToString());
+        return new Regex(_pattern.ToString(), _options);
     }
+	
+	public string ToRegexString()
+	{
+		return _pattern.ToString();
+	}
 
     public void Dispose()
     {
