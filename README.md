@@ -5,6 +5,7 @@ Similar to Magic-Regexp, allows for a more intuitive way to build regexes.
 Example 1:
 
 ```csharp
+string exampleString = "A1234567B";
 var regex = new RegexBuilder()
     .LineStart          //Ensure that the string must start with the following expression, in this case, S, T, F, G or M
     .CharIn("STFGM")    // S, T, F, G, or M
@@ -21,7 +22,8 @@ var isMatchRegex = regex.IsMatch(exampleString);
 Example 2:
 
 ```csharp
-var isMatch = testString.IsMatch(regex => regex
+string exampleString = "A1234567B";
+var isMatch = exampleString.IsMatch(regex => regex
     .LineStart
     .CharIn("STFGM")
     .Digit.Exactly(7)
