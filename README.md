@@ -6,7 +6,7 @@ Example 1:
 
 ```csharp
 string exampleString = "A1234567B";
-var regex = new RegexBuilder()
+Regex regex = new RegexBuilder()
     .LineStart          //Ensure that the string must start with the following expression, in this case, S, T, F, G or M
     .CharIn("STFGM")    // S, T, F, G, or M
     .Digit.Exactly(7)	// Exactly 7 digits. You can also do something like this: And(x => x.Digit.Exactly(7).Letter.Exactly(1))
@@ -23,7 +23,7 @@ Example 2:
 
 ```csharp
 string exampleString = "A1234567B";
-var isMatch = exampleString.IsMatch(regex => regex
+bool isMatch = exampleString.IsMatch(regex => regex
     .LineStart
     .CharIn("STFGM")
     .Digit.Exactly(7)

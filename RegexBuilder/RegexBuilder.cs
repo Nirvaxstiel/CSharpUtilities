@@ -1,6 +1,7 @@
 public class RegexBuilder
     {
         private List<object> Inputs;
+		private RegexOptions[] Options;
 
         public RegexBuilder()
         {
@@ -189,6 +190,15 @@ public class RegexBuilder
 
         public Regex ToRegex(params RegexOptions[] options)
         {
+			if (options.Count() == 0 && this.Options.Any())
+            {
+                options = Options;
+            }
+            else
+            {
+                this.Options = options;
+            }
+
             var pattern = Regex.Unescape($"{string.Join("", Inputs)}");
             Optimise(pattern);
             return new Regex(pattern, (RegexOptions)options.Aggregate(0, (acc, option) => acc | (int)option));
