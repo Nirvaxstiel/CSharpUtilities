@@ -62,9 +62,9 @@ public class RegexBuilder
 
         public RegexBuilder CarriageReturn => Exactly(@"\r");
 
-        public RegexBuilder Maybe => new RegexBuilder().Exactly(@"?");
+        public RegexBuilder Maybe => Exactly(@"?");
 
-        public RegexBuilder OneOrMore => new RegexBuilder().Exactly(@"+");
+        public RegexBuilder OneOrMore => Exactly(@"+");
 
         public RegexBuilder As(string groupName)
         {
@@ -100,7 +100,7 @@ public class RegexBuilder
             return this;
         }
 
-        public RegexBuilder Or => new RegexBuilder().Exactly(@"|");
+        public RegexBuilder Or => Exactly(@"|");
 
         public RegexBuilder After(string expression) => Exactly($@"(?<={expression})");
 
@@ -182,7 +182,7 @@ public class RegexBuilder
             return this;
         }
 
-        public RegexBuilder Optionally => new RegexBuilder().Exactly(@"?");
+        public RegexBuilder Optionally => Exactly(@"?");
 
         public RegexBuilder LineStart => Exactly(@"^");
 
