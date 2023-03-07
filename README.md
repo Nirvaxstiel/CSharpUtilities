@@ -34,3 +34,15 @@ bool isMatch = exampleString.IsMatch(regex => regex
 
 // Regex String : ^[STFGM]\d{7}[A-Za-z]$
 ```
+
+# Password Generator (Windows Powershell)
+
+In accordance to the events of LastPass, I made a script to generate my own passwords instead of relying on third party generators.
+
+Usage:
+
+```powershell
+./getpw.ps1 -length 20 -count 3 -output "mypasswords.txt"
+```
+
+![Powershell Password Generator](img/getpw.png?raw=true)
