@@ -250,6 +250,18 @@ namespace System.Text.RegularExpressions
             Inputs.Add($"{{{min},{max}}}");
             return this;
         }
+		
+		/// <summary>
+        /// Selects any string that is enclosed by the given start and end strings.
+        /// </summary>
+        /// <param name="min"></param>
+        /// <param name="max"></param>
+        /// <returns></returns>
+		public RegexBuilder AnyBetween(string start, string end)
+		{
+			Inputs.Add(Regex.Escape($"{Regex.Escape(start)}.*{Regex.Escape(end)}"));
+			return this;
+		}
 
         /// <summary>
         /// Adds a character set to match any character in input.
